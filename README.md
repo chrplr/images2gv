@@ -14,13 +14,17 @@ The `.gv` format is designed for ultra-fast, low-overhead video playback in crea
 
 ## Installation
 
+### Download Binaries
+
+Pre-built binaries for Windows, macOS, and Linux (amd64 and arm64) are available on the [Releases page](https://github.com/chrplr/images2gv/releases).
+
+### Install with Go
+
 Ensure you have [Go](https://go.dev/doc/install) installed, then run:
 
 ```bash
-go install github.com/yourusername/images2gv/cmd/images2gv@latest
+go install github.com/chrplr/images2gv/cmd/images2gv@latest
 ```
-
-*Note: Replace `yourusername` with your actual GitHub username.*
 
 ## Usage
 
