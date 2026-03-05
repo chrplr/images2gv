@@ -73,4 +73,4 @@ Based on the "Extreme GPU Friendly Video Format" originally implemented in C++ f
 
 ## License
 
-[MIT](LICENSE)
+[GPLv3](LICENSE)
