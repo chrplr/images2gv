@@ -18,9 +18,9 @@
 
 package main
 
-
 import (
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
 	"image"
@@ -33,7 +33,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/pierrec/lz4/v4"
@@ -61,7 +62,9 @@ type result struct {
 }
 
 func main() {
-	fpsFlag := flag.Float64("fps", 30.0, "Frames per second")
+	fpsFlag := flag.Float64("fps", 60.0, "Frames per second")
+	forceSize := flag.Bool("force-size", false,
+		"Crop/pad frames that do not match the first frame instead of failing")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] <input_dir> <output.gv>\n", os.Args[0])
 		flag.PrintDefaults()
@@ -84,11 +87,22 @@ func main() {
 		matches, _ := filepath.Glob(filepath.Join(inputDir, p))
 		files = append(files, matches...)
 	}
-	
+
 	if len(files) == 0 {
 		log.Fatalf("No images found in %s", inputDir)
 	}
-	sort.Strings(files)
+
+	// Order numerically, not lexicographically: with unpadded names a plain
+	// string sort puts frame_10 before frame_2 and the clip plays out of order.
+	lexical := slices.Clone(files)
+	slices.Sort(lexical)
+	slices.SortFunc(files, naturalCompare)
+
+	if !slices.Equal(files, lexical) {
+		fmt.Fprintf(os.Stderr,
+			"Note: using natural numeric order; a plain string sort would order these differently.\n"+
+				"      First frame: %s\n", filepath.Base(files[0]))
+	}
 
 	// 2. Get dimensions from the first frame
 	firstFile, err := os.Open(files[0])
@@ -102,6 +116,17 @@ func main() {
 	}
 	bounds := img.Bounds()
 	width, height := uint32(bounds.Dx()), uint32(bounds.Dy())
+
+	// Check every frame's size before creating the output file. A frame that
+	// silently gets cropped or letterboxed is the kind of fault that only
+	// surfaces once the data are analysed, so refuse by default. Doing it here
+	// rather than mid-encode means a rejected sequence leaves no partial .gv
+	// behind, and reports every offending file at once.
+	if !*forceSize {
+		if err := checkFrameSizes(files, width, height); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	// 3. Create Output File
 	out, err := os.Create(outputFile)
@@ -165,7 +190,7 @@ func main() {
 			if !ok {
 				break
 			}
-			
+
 			currentPos, _ := out.Seek(0, io.SeekCurrent)
 			offsets[receivedCount] = FrameIndex{
 				Address: uint64(currentPos),
@@ -194,6 +219,50 @@ func main() {
 	}
 
 	fmt.Printf("\nDone! Saved %d frames to %s (%dx%d, %.2f fps)\n", len(files), outputFile, width, height, *fpsFlag)
+}
+
+// checkFrameSizes verifies that every image matches the given dimensions.
+// It reads only image headers (DecodeConfig), so it is cheap even for long
+// sequences. All mismatches are reported together rather than one per run.
+func checkFrameSizes(files []string, w, h uint32) error {
+	type mismatch struct {
+		path string
+		w, h int
+	}
+	var bad []mismatch
+
+	for _, path := range files {
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		cfg, _, err := image.DecodeConfig(f)
+		f.Close()
+		if err != nil {
+			return fmt.Errorf("could not read %s: %w", path, err)
+		}
+		if uint32(cfg.Width) != w || uint32(cfg.Height) != h {
+			bad = append(bad, mismatch{path, cfg.Width, cfg.Height})
+		}
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d of %d frames do not match the first frame (%dx%d):\n",
+		len(bad), len(files), w, h)
+	const maxShown = 10
+	for i, m := range bad {
+		if i == maxShown {
+			fmt.Fprintf(&b, "  ... and %d more\n", len(bad)-maxShown)
+			break
+		}
+		fmt.Fprintf(&b, "  %s is %dx%d\n", filepath.Base(m.path), m.w, m.h)
+	}
+	b.WriteString("All frames must be the same size. " +
+		"Pass --force-size to crop/pad them against the first frame instead.")
+	return errors.New(b.String())
 }
 
 func processFrame(path string, w, h uint32) ([]byte, error) {

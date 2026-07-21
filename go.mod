@@ -1,4 +1,4 @@
-module images2gv
+module github.com/chrplr/images2gv
 
 go 1.25.7
 

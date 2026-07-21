@@ -42,7 +42,43 @@ images2gv [options] <input_directory> <output.gv>
 
 ### Options
 
-- `--fps`: Set the playback speed (default: `30.0`).
+- `--fps`: Set the playback speed (default: `60.0`).
+- `--force-size`: Crop/pad frames that do not match the first frame, instead of
+  failing (see [Frame sizes](#frame-sizes)).
+
+### Frame sizes
+
+All frames must have the same dimensions. Sizes are checked up front, before
+the output file is created, and a mismatch aborts with every offending file
+listed:
+
+```
+3 of 8 frames do not match the first frame (64x48):
+  frame_3.png is 100x100
+  frame_5.png is 64x50
+  frame_7.png is 32x24
+All frames must be the same size. Pass --force-size to crop/pad them against the first frame instead.
+```
+
+Pass `--force-size` to get the permissive behaviour: every frame is drawn into
+the first frame's dimensions, cropping what overflows and leaving transparent
+padding where it falls short.
+
+### Frame ordering
+
+Frames are ordered by **natural numeric order**, so `frame_2.png` comes before
+`frame_10.png`. A plain lexicographic sort would put `frame_10` first and
+silently produce a video whose frames play out of sequence — with no error and
+nothing to indicate anything went wrong.
+
+Zero-padded names (`frame_0001.png`, as produced by `video2pngs.sh`) sort
+correctly either way. When the natural and lexicographic orders differ,
+`images2gv` prints a note so you can see that it mattered:
+
+```
+Note: using natural numeric order; a plain string sort would order these differently.
+      First frame: frame_1.png
+```
 
 ### Example
 
