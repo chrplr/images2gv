@@ -32,7 +32,7 @@ jobs:
           if [ "${{ matrix.goos }}" = "windows" ]; then
             BINARY_NAME=images2gv.exe
           fi
-          go build -v -o "dist/images2gv-${{ matrix.goos }}-${{ matrix.goarch }}$([ "${{ matrix.goos }}" = "windows" ] && echo .exe)" ./cmd/images2gv/main.go
+          go build -v -o "dist/images2gv-${{ matrix.goos }}-${{ matrix.goarch }}$([ "${{ matrix.goos }}" = "windows" ] && echo .exe)" ./cmd/images2gv
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

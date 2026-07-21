@@ -10,6 +10,6 @@ fi
 echo "Building images2gv for $(go env GOOS)/$(go env GOARCH)..."
 
 # Build the project
-go build -v -o "$BINARY_NAME" ./cmd/images2gv/main.go
+go build -v -o "$BINARY_NAME" ./cmd/images2gv
 
 echo "Build successful: ./$BINARY_NAME"
